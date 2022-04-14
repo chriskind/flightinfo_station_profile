@@ -1,0 +1,8 @@
+name = Flightinfo Station Profile
+description = Station Profile Helpers Support
+package = Flightinfo
+core = 7.x
+version = "7.x-1.0"
+files[] = includes/FlightinfoStationProfile.inc
+files[] = includes/FlightonfoStationProfileViews.inc
+configure = admin/config/flightinfo/station_profile

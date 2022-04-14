@@ -1,0 +1,299 @@
+<?php
+
+/*
+ * Runs FlightinfoStationProfile->__construct if needed to set some static variables
+ * 
+ * TODO
+ * This should be optimized at some point to not run redundantly
+ * 
+ * TODO
+ * Chain of contexrual variables needs to be defined module wide for all views
+ *  right now it is roughly
+ *  airport NID/Company NID/Taxonomy ID
+ *  
+ *  INPUT AIRPORTS:
+ *  ATL
+ *  BNA NASHVILLE
+ *  BUF
+ *  CVG CINCI
+ *  CLT
+ *  CMH COLUMBUS (SOME)
+ *  MIA MIAMI (SOME)
+ *  MSY NOLA (SOME)
+ *  EWR NEWARK (SOME)
+ *  
+ *  
+ */
+
+$file = drupal_get_path('module', 'cck_phone') . '/includes/phone.us.inc';
+include_once($file);
+
+function flightinfo_station_profile_view_builder($airport_id = NULL, $view_name = 'airports', $display_id = 'block_5') {
+  if(empty(FlightinfoStationProfile::$airportId) | $airport_id != FlightinfoStationProfile::$airportId) {
+    $FlightinfoStationProfile = new FlightinfoStationProfile($airport_id, $view_name, $display_id);
+  }
+}
+
+function flightinfo_station_profile_companies($airport_id = NULL, $view_name = 'airports', $display_id = 'block_5', $piece = NULL) {
+  
+  flightinfo_station_profile_view_builder($airport_id);
+  $tabSwitch = FlightinfoStationProfile::$tabSwitch;
+  
+  flightinfo_station_profile_debug();
+  
+  $render = '';
+  $tab_num = 0; 
+  
+  foreach(FlightinfoStationProfile::$viewsDisplays as $view) {
+    
+    if($tab_num == 0) {
+      $tab_active = 'active';
+    } else {
+      $tab_active = 'fade';
+    } 
+    
+    
+    if($tabSwitch != 0) {
+      $prefix = '<div class="clearfix tab-pane ' . $tab_active . '" id="' . $view['anchor_id'] . '">';
+    } else {
+      $prefix = '<div class="clearfix " id="' . $view['anchor_id'] . '">';
+    }
+    
+    if(strpos($view['anchor_id'],'airport-info--authority') !== FALSE) {
+      $wrapper_content_open = ''; // '<div class="station-profile-data-row">';
+      $wrapper_content_close = ''; // '</div>';
+    } else {
+      $wrapper_content_open = '';
+      $wrapper_content_close = '';
+    }
+    
+    $header = $view['header'];
+    $content = $view['view'];
+    $postfix = '</div>';
+    
+    $render .= $prefix . $header . $wrapper_content_open . $content . $wrapper_content_close . $postfix;
+    $tab_num = $tab_num + 1;
+  }
+  return $render;
+  
+}
+
+
+function flightinfo_station_profile_tab_mappings($airport_id = NULL) {
+
+  flightinfo_station_profile_view_builder($airport_id);
+  $tab_mapping = array();
+  foreach(FlightinfoStationProfile::$tabMappingsVendors as $key => $tab) {
+    $tab_mapping[$key] = $tab;
+  }
+  return $tab_mapping;
+}
+
+
+function flightinfo_station_profile_tabs_render($airport_id = NULL) {
+  
+  flightinfo_station_profile_view_builder($airport_id);
+  
+  // adhd_buffer_to_dsm($airport_id, 'dpm');
+  $tab_mapping =  flightinfo_station_profile_tab_mappings($airport_id); // FlightinfoStationProfile::$tabMappingsTopLevel;
+  $tab_switch = variable_get('flightinfo_station_profile_tab_switch', 1);
+
+  if($tab_switch == 0) {
+    $hidden = 'hidden ';
+  } else {
+    $hidden = '';
+  }
+  
+  // adhd_buffer_to_dsm($tab_mapping, 'dpm');
+  $html = '<ul class="' . $hidden . 'station-profile-nav-tabs nav nav-tabs">';
+  foreach($tab_mapping as $tab_id => $values) {
+    if($tab_num == 0) {
+      $open_li = '<li class="active">';
+    } else {
+      $open_li = '<li>';
+    }
+    
+    $html .= $open_li . '<a href="#' . $tab_id . '" data-toggle="tab">' . $values['title'] . '</a></li>';
+    $tab_num = $tab_num + 1;
+  }
+  $html .= '</ul>';
+  return $html;
+  
+}
+
+
+/*
+ * TODO move theme functions to classes
+ */
+
+
+function flightinfo_station_profile_preprocess(&$vars) {
+  
+}
+
+
+function flightinfo_station_profile_theme() {
+  
+  return array(
+    'field_phone_number_s_' => array(
+      'variables' => array(
+        'rows' => NULL,
+      ),
+      'field_array' => array(
+        'field_additional_descriptor',
+        'field_type',
+        'field_phone_number',
+      ),
+      'path' => drupal_get_path('module', 'flightinfo_station_profile') . '/theme',
+      'template' => 'field-phone-number-s-',
+    ),
+    
+    'field_contact_radio_frequencies' => array(
+      'variables' => array(
+        'rows' => NULL,
+      ),
+      'field_array' => array(
+        'field_fc_radio_name_used_for',
+        'field_fc_radio_frequency',
+      ),
+      'path' => drupal_get_path('module', 'flightinfo_station_profile') . '/theme',
+      'template' => 'field-contact-radio-frequencies',
+    ),
+    
+      
+    'field_company_address' => array(
+      'variables' => array(
+        'rows' => NULL,
+      ),
+      'field_array' => array(
+        'field_fc_address_type',
+        'field_fc_address',
+      ),
+      'path' => drupal_get_path('module', 'flightinfo_station_profile') . '/theme',
+      'template' => 'field-company-address',
+      ),
+    );
+}
+
+
+/**
+ * @param unknown_type $field_name
+ * @param unknown_type $variables
+ * @return string
+ */
+
+function flightinfo_station_profile_format_field($variables = array(), $vars = array()) {
+  
+  $theme_info = flightinfo_station_profile_theme();
+  $field_name = $variables['#field']['field_name'];
+  $field_array = ($theme_info[$field_name]['field_array']);
+  
+  $template = str_replace('_', '-', $variables['field_name']) . 'php.tpl';
+  
+  $vars['element'] = $variables;
+  adhd_helpers_rows_from_field_collection($vars, $field_name, $field_array);
+  
+  
+  foreach($vars['rows'] as $row_id => $row) {
+      foreach ($row as $key => $value) {
+        if($key == 'field_phone_number') {
+          $vars['rows'][$row_id]['field_phone_number_string'] = flightinfo_phone_to_string($value);
+        }
+        
+        if($key == 'field_fc_address_type') {
+          
+        }
+        
+      }
+  }
+  
+  // adhd_buffer_to_dsm_object_properties($vars, 'dpm');
+  $output = '';
+  
+  $output = theme($field_name, $vars);
+  // adhd_buffer_to_dsm($output);
+  return $output;
+}
+
+
+
+
+function flightinfo_station_profile_debug($FlightinfoStationProfile = NULL, $options = NULL) {
+  // adhd_buffer_to_dsm($airport_nid);
+  // adhd_buffer_to_dsm($FlightinfoStationProfile->terms);
+  // adhd_buffer_to_dsm($FlightinfoStationProfile->tids);
+  // adhd_buffer_to_dsm($FlightinfoStationProfile->views_displays, 'dpm');
+  adhd_buffer_to_dsm((FlightinfoStationProfile::$debugInfo), 'dpm');
+  adhd_buffer_to_dsm(FlightinfoStationProfile::$viewsDisplays, 'dpm');
+}
+
+function flightinfo_station_profile_contact_region_select() {
+  $options = array(
+    'local' => 'Local',
+    'global' => 'Global',
+  );
+  return $options;
+}
+
+/*
+ * MOVED TO FlightonfoStationProfileViews or FlightonfoStationProfile
+ */
+
+function flightinfo_station_profile_select_field($view = 'airports', $display = 'page_8') {
+  return FlightinfoStationProfile::selectField($view);
+}
+
+function flightinfo_station_profile_select_display($view = 'airports', $display = 'page_8') {
+  return FlightinfoStationProfile::selectDisplay($view);
+}
+
+function flightinfo_station_profile_select_view($view = 'airports') {
+  return FlightinfoStationProfile::selectView($view);
+}
+
+function flightinfo_station_profile_views_default_getter($variable = NULL) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  return $FlightonfoStationProfileViews->views_default_getter($variable);
+}
+
+function flightinfo_station_profile_views_default_setter($variable = NULL, $value = NULL) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  $FlightonfoStationProfileViews->views_default_setter($variable, $value);
+}
+
+function flightinfo_station_profile_return_default_variable($view, $return = 'value', $id = NULL) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  return $FlightonfoStationProfileViews->return_default_variable($view, $return, $id);
+}
+
+function flightinfo_Station_add_link_to_view_edit_with_context($view) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  return $FlightonfoStationProfileViews->add_link_to_view_edit_with_context($view);
+
+}
+
+
+/*
+ * Standard drupal HOOK_views implementations...
+ */
+
+function flightinfo_station_profile_views_pre_view(&$view, $display_id, $args) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  $FlightonfoStationProfileViews->views_pre_view($view, $display_id, $args);
+}
+
+function flightinfo_station_profile_views_query_alter(&$view, &$query) {
+  if($view->name == 'airports' && $view->current_display == 'block_7') {
+    // adhd_buffer_to_dsm($query, 'dpm');
+  }
+}
+
+function flightinfo_station_profile_views_pre_execute(&$view) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  $FlightonfoStationProfileViews->views_pre_execute($view);
+}
+
+function flightinfo_station_profile_views_pre_render(&$view) {
+  $FlightonfoStationProfileViews = new FlightonfoStationProfileViews();
+  $FlightonfoStationProfileViews->views_pre_render($view);
+}
